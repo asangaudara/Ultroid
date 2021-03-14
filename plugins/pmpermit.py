@@ -7,16 +7,12 @@
 
 """
 ✘ Commands Available -
-
 • `{i}a` or `{i}approve`
     To Approve Someone In PM.
-
 • `{i}da` or `{i}disapprove`
     To Disapprove Someone In PM.
-
 • `{i}block`
     To Block Someone in PM.
-
 • `{i}unblock`
     To Unblock Someone in PM.
 """
@@ -35,42 +31,29 @@ LASTMSG = {}
 if Redis("PMPIC"):
     PMPIC = Redis("PMPIC")
 else:
-    PMPIC = "https://telegra.ph/file/94f6a4aeb21ce2d58dd41.jpg"
-
-UND = get_string("pmperm_1")
+    PMPIC = "https://telegra.ph/file/c2114c515c520855a9e37.jpg"
 
 if not Redis("PM_TEXT"):
     UNAPPROVED_MSG = """
-**PMSecurity of {ON}!**
-
-{UND}
-
-You have {warn}/{twarn} warnings!"""
+**PMSecurity of {}!**
+Please Wait For Me to Respnd Or You Will be Blocked And Reported as Spam!!
+You have {}/{} warnings!"""
 else:
     UNAPPROVED_MSG = (
         """
-**PMSecurity of {ON}!**"""
-        f"""
-
-{Redis("PM_TEXT")}
-"""
+**PMSecurity of {}!**"""
+        f"""{Redis("PM_TEXT")}"""
         """
-
-{UND}
-
-You have {warn}/{twarn} warnings!"""
+Please Wait For Me to Respnd Or You Will be Blocked And Reported as Spam!!
+You have {}/{} warnings!"""
     )
 
-UNS = get_string("pmperm_2")
+UND = "Please Wait For Me to Respnd Or You Will be Blocked And Reported as Spam!!"
+UNS = "You were spamming my Master's PM, which I didn't like."
 # 1
-if Redis("PMWARNS"):
-    try:
-        WARNS = int(Redis("PMWARNS"))
-    except BaseException:
-        WARNS = 4
-else:
-    WARNS = 4
-NO_REPLY = get_string("pmperm_3")
+
+WARNS = 10
+NO_REPLY = "Reply to someone's msg or try this commmand in private."
 PMCMDS = [
     f"{hndlr}a",
     f"{hndlr}approve",
@@ -87,10 +70,8 @@ async def permitpm(event):
     user = await event.get_chat()
     if user.bot or user.is_self:
         return
-    if Redis("PMLOG") == "True":
-        pl = udB.get("PMLOGGROUP")
-        if pl is not None:
-            return await event.forward_to(pl)
+    apprv = is_approved(user.id)
+    if apprv and (Redis("PMLOG") == "True"):
         await event.forward_to(Var.LOG_CHANNEL)
 
 
@@ -102,12 +83,12 @@ if sett == "True" and sett != "False":
     @ultroid_bot.on(events.NewMessage(outgoing=True, func=lambda e: e.is_private))
     async def autoappr(e):
         miss = await e.get_chat()
-        if miss.bot or miss.is_self or miss.verified or Redis("AUTOAPPROVE") != "True":
+        if miss.bot or miss.is_self or miss.verified:
             return
         if str(miss.id) in DEVLIST:
             return
         mssg = e.text
-        if mssg.startswith(HNDLR):  # do not approve if outgoing is a command.
+        if mssg in PMCMDS:  # do not approve if outgoing is a command.
             return
         if not is_approved(e.chat_id):
             approve_user(e.chat_id)
@@ -138,9 +119,9 @@ if sett == "True" and sett != "False":
             mention = f"[{get_display_name(user)}](tg://user?id={user.id})"
             count = len(get_approved())
             try:
-                wrn = COUNT_PM[user.id] + 1
+                wrn = COUNT_PM[user.id]
             except KeyError:
-                wrn = 1
+                wrn = 0
             if user.id in LASTMSG:
                 prevmsg = LASTMSG[user.id]
                 if event.text != prevmsg:
@@ -156,17 +137,7 @@ if sett == "True" and sett != "False":
                     await event.client.send_file(
                         user.id,
                         PMPIC,
-                        caption=UNAPPROVED_MSG.format(
-                            ON=OWNER_NAME,
-                            warn=wrn,
-                            twarn=WARNS,
-                            UND=UND,
-                            name=name,
-                            fullname=fullname,
-                            username=username,
-                            count=count,
-                            mention=mention,
-                        ),
+                        caption=UNAPPROVED_MSG.format(OWNER_NAME, wrn, WARNS),
                     )
                 elif event.text == prevmsg:
                     async for message in event.client.iter_messages(
@@ -176,46 +147,24 @@ if sett == "True" and sett != "False":
                     await event.client.send_file(
                         user.id,
                         PMPIC,
-                        caption=UNAPPROVED_MSG.format(
-                            ON=OWNER_NAME,
-                            warn=wrn,
-                            twarn=WARNS,
-                            UND=UND,
-                            name=name,
-                            fullname=fullname,
-                            username=username,
-                            count=count,
-                            mention=mention,
-                        ),
+                        caption=UNAPPROVED_MSG.format(OWNER_NAME, wrn, WARNS),
                     )
                 LASTMSG.update({user.id: event.text})
             else:
-                async for message in event.client.iter_messages(user.id, search=UND):
-                    await message.delete()
                 await event.client.send_file(
                     user.id,
                     PMPIC,
-                    caption=UNAPPROVED_MSG.format(
-                        ON=OWNER_NAME,
-                        warn=wrn,
-                        twarn=WARNS,
-                        UND=UND,
-                        name=name,
-                        fullname=fullname,
-                        username=username,
-                        count=count,
-                        mention=mention,
-                    ),
+                    caption=UNAPPROVED_MSG.format(OWNER_NAME, wrn, WARNS),
                 )
                 LASTMSG.update({user.id: event.text})
             if user.id not in COUNT_PM:
                 COUNT_PM.update({user.id: 1})
             else:
                 COUNT_PM[user.id] = COUNT_PM[user.id] + 1
-            if COUNT_PM[user.id] >= WARNS:
-                async for message in event.client.iter_messages(user.id, search=UND):
-                    await message.delete()
-                await event.respond(UNS)
+            if COUNT_PM[user.id] > WARNS:
+                await event.respond(
+                    "`You were Spamming ME, Which I didn't like.`\n`You Have Been BLOCKED And REPORTED as SPAM, Until Further Notice.`"
+                )
                 try:
                     del COUNT_PM[user.id]
                     del LASTMSG[user.id]
@@ -251,7 +200,7 @@ if sett == "True" and sett != "False":
             if not is_approved(uid):
                 approve_user(uid)
                 await apprvpm.edit(f"[{name0}](tg://user?id={uid}) `approved to PM!`")
-                await asyncio.sleep(3)
+                await asyncio.sleep(10)
                 await apprvpm.delete()
             else:
                 await apprvpm.edit("`User may already be approved.`")
@@ -274,7 +223,7 @@ if sett == "True" and sett != "False":
                     await message.delete()
                 async for message in apprvpm.client.iter_messages(user.id, search=UNS):
                     await message.delete()
-                await asyncio.sleep(3)
+                await asyncio.sleep(10)
                 await apprvpm.delete()
                 if Var.LOG_CHANNEL:
                     await apprvpm.client.send_message(
